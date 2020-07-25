@@ -47,6 +47,8 @@ void PlayScene::update()
 	CollisionManager::AABBCheck(m_pPlayer, m_pObstacle);
 
 	m_setGridLOS();
+
+	m_movePlaneToTargetNode();
 }
 
 void PlayScene::clean()
@@ -294,7 +296,7 @@ void PlayScene::m_buildClockwisePatrolPath()
 	// moving left
 	for (auto i = 1; i < Config::COL_NUM; i++)
 	{
-		m_pPatrolPath.push_back(m_pGrid[Config::COL_NUM + Config::ROW_NUM - 1 - i]);
+		m_pPatrolPath.push_back(m_pGrid[Config::COL_NUM * Config::ROW_NUM - 1 - i]);
 	}
 	
 	// moving up
@@ -304,33 +306,6 @@ void PlayScene::m_buildClockwisePatrolPath()
 	}
 }
 
-//void PlayScene::m_buildClockwisePatrolPath()
-//{
-//
-//	// right
-//	for (auto i = 0; i < Config::COL_NUM; i++)
-//	{
-//		m_pPatrolPath.push_back(m_pGrid[i]);
-//	}
-//
-//	// down
-//	for (auto i = 1; i < Config::ROW_NUM; i++)
-//	{
-//		m_pPatrolPath.push_back(m_pGrid[i * Config::COL_NUM + Config::COL_NUM - 1]);
-//	}
-//
-//	// left
-//	for (auto i = 1; i < Config::COL_NUM; i++)
-//	{
-//		m_pPatrolPath.push_back(m_pGrid[Config::COL_NUM * Config::ROW_NUM - 1 - i]);
-//	}
-//
-//	//up
-//	for (auto i = Config::ROW_NUM - 2; i > 0; i--)
-//	{
-//		m_pPatrolPath.push_back(m_pGrid[i * Config::COL_NUM]);
-//	}
-//}
 
 void PlayScene::m_displayPatrolPath()
 {
@@ -338,6 +313,48 @@ void PlayScene::m_displayPatrolPath()
 	 {
 		 std::cout << "(" << node->getTransform()->position.x << ", " << node->getTransform()->position.y << ")" << std::endl;
 	 }
+}
+
+void PlayScene::m_movePlaneToTargetNode()
+{
+	if(m_bPatrolMode)
+	{
+		m_pTargetPathNode = m_pPatrolPath[m_targetPathNodeIndex];
+
+		// return a vector of util length
+		auto targetVector = Util::normalize(m_pTargetPathNode->getTransform()->position - m_pPlaneSprite->getTransform()->position);
+
+		// rotate PlaneSprite's Texture according to direction of travel
+		if(targetVector.x == 1)
+		{
+			m_pPlaneSprite->setAngle(90.0f);
+		}
+		else if (targetVector.x == -1)
+		{
+			m_pPlaneSprite->setAngle(-90.0f);
+		}
+
+		if(targetVector.y == 1)
+		{
+			m_pPlaneSprite->setAngle(180.0f);
+		}
+		else if(targetVector.y == -1)
+		{
+			m_pPlaneSprite->setAngle(0.0f);
+		}
+
+		m_pPlaneSprite->getRigidBody()->velocity = targetVector;
+		m_pPlaneSprite->getTransform()->position += m_pPlaneSprite->getRigidBody()->velocity * m_pPlaneSprite->getRigidBody()->maxSpeed;
+		if(m_pPlaneSprite->getTransform()->position == m_pTargetPathNode->getTransform()->position)
+		{
+			m_targetPathNodeIndex++;
+			if(m_targetPathNodeIndex > m_pPatrolPath.size() -1)
+			{
+				m_targetPathNodeIndex = 0;
+			}
+		}
+		
+	}
 }
 
 
@@ -348,7 +365,8 @@ void PlayScene::start()
 	m_buildGrid();
 
 	m_buildClockwisePatrolPath();	
-	m_displayPatrolPath();
+	//m_displayPatrolPath();
+	m_targetPathNodeIndex = 1;
 	
 	m_bDebugMode = false;
 	m_bPatrolMode = false;
@@ -356,12 +374,9 @@ void PlayScene::start()
 	// Plane Sprite
 	m_pPlaneSprite = new Plane();
 	m_pPlaneSprite->getTransform()->position = m_pPatrolPath[0]->getTransform()->position;
+	m_pPlaneSprite->getRigidBody()->maxSpeed = 5.0f;
 	addChild(m_pPlaneSprite);
 
-	glm::vec2 nextPosition = m_pPatrolPath[1]->getTransform()->position - m_pPlaneSprite->getTransform()->position;
-	glm::vec2 normalized = Util::normalize(nextPosition);
-
-	std::cout << "Normalized direction: (" << normalized.x << ", " << normalized.y << ")" << std::endl;
 	// Player Sprite
 	m_pPlayer = new Player();
 	m_pPlayer->getTransform()->position = glm::vec2(600.0f, 440.0f);
